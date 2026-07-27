@@ -249,6 +249,19 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
     }
   });
 
+  // Expose function to track assertions
+  await page.exposeFunction('recordAssertion', (info: { selector: string, expectedValue: string }) => {
+    if (!recordingEnabled) return;
+    console.log(`\n[Event] Assertion recorded: expect(${info.selector}) to contain '${info.expectedValue}'`);
+    const cleanSelector = info.selector.replace(/'/g, "\\'");
+    const cleanValue = info.expectedValue.replace(/'/g, "\\'");
+    
+    const varName = 'val_' + Math.random().toString(36).substring(2, 7);
+    generatedTestLines.push(`  // --- Assertion Manual ---`);
+    generatedTestLines.push(`  const ${varName} = await page.locator('${cleanSelector}').textContent();`);
+    generatedTestLines.push(`  expect(${varName}).toContain('${cleanValue}');\n`);
+  });
+
   // Expose function to track clicks
   await page.exposeFunction('recordUserAction', (info: any) => {
     if (!recordingEnabled) return;
@@ -290,8 +303,13 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
 
     // Click listener
     document.addEventListener('click', (e) => {
-      console.log('[Crawlker] Click intercepted!');
       const target = e.target;
+      
+      // Ignorar clicks dentro de nuestro propio prompt modal
+      if (target && target.id && target.id.startsWith('crawlker-prompt-')) return;
+      if (target && target.closest && target.closest('#crawlker-custom-prompt')) return;
+
+      console.log('[Crawlker] Click intercepted!');
       const clickable = target.closest('button, a, [role="button"], input, select, textarea');
       
       function getSelector(el) {
@@ -306,6 +324,56 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
           if (classes) selector += '.' + classes;
         }
         return selector;
+      }
+
+      // Alt+Click para registrar un expect manual
+      if (e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Si no hay un target específico, usamos el general
+        const elParaLeer = clickable || target;
+        const selector = getSelector(elParaLeer);
+        const currentValue = elParaLeer.innerText || elParaLeer.value || elParaLeer.textContent || '';
+        
+        // Crear un modal HTML custom porque Playwright auto-descarta window.prompt
+        const customPrompt = document.createElement('div');
+        customPrompt.id = 'crawlker-custom-prompt';
+        customPrompt.style.position = 'fixed';
+        customPrompt.style.top = '50%';
+        customPrompt.style.left = '50%';
+        customPrompt.style.transform = 'translate(-50%, -50%)';
+        customPrompt.style.background = 'white';
+        customPrompt.style.padding = '20px';
+        customPrompt.style.border = '2px solid black';
+        customPrompt.style.zIndex = '9999999';
+        customPrompt.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+        customPrompt.innerHTML = 
+          '<p style="margin-top: 0; color: black; font-family: sans-serif;">Ingresa el valor esperado para este campo:</p>' +
+          '<input type="text" id="crawlker-prompt-input" style="width: 100%; margin-bottom: 10px; padding: 5px;" />' +
+          '<div style="text-align: right;">' +
+            '<button id="crawlker-prompt-cancel" style="margin-right: 10px;">Cancelar</button>' +
+            '<button id="crawlker-prompt-ok">OK</button>' +
+          '</div>';
+        document.body.appendChild(customPrompt);
+        
+        const input = document.getElementById('crawlker-prompt-input');
+        input.value = currentValue.trim();
+        input.focus();
+        
+        document.getElementById('crawlker-prompt-ok').onclick = function(ev) {
+          ev.stopPropagation();
+          const expectedValue = input.value;
+          customPrompt.remove();
+          showToast('Assertion: ' + expectedValue);
+          window.recordAssertion({ selector: selector, expectedValue: expectedValue }).catch(console.error);
+        };
+        
+        document.getElementById('crawlker-prompt-cancel').onclick = function(ev) {
+          ev.stopPropagation();
+          customPrompt.remove();
+        };
+        return;
       }
 
       if (clickable) {

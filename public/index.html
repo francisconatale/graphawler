@@ -31,7 +31,14 @@
   <div style="margin-bottom: 20px;">
     <h3>Prueba de accesibilidad (Input)</h3>
     <input type="text" aria-label="Buscar en el sitio" placeholder="Buscar..." style="padding: 8px; width: 200px;">
-    <button>Buscar</button>
+  </div>
+  <br>
+
+  <!-- Counter para E2E Test -->
+  <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; max-width: 300px;">
+    <h3>Contador</h3>
+    <p style="font-size: 24px;">Valor: <span data-testid="counter-value">0</span></p>
+    <button data-testid="increment-btn" id="increment-btn">Incrementar Contador</button>
   </div>
   <br>
 
@@ -64,6 +71,15 @@
       if (e.target === modal) {
         closeModal();
       }
+    }
+
+    // Lógica del contador
+    const incrementBtn = document.getElementById('increment-btn');
+    const counterValue = document.querySelector('[data-testid="counter-value"]');
+    
+    incrementBtn.onclick = function() {
+      let val = parseInt(counterValue.innerText, 10);
+      counterValue.innerText = val + 1;
     }
   </script>
 </body>
