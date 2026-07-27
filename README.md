@@ -1,6 +1,6 @@
 # Graphawler (anteriormente Crawlker)
 
-[![License](https://img.shields.io/github/license/YOUR_ORG/crawlker)](./LICENSE)
+[![License](https://img.shields.io/github/license/francisconatale/crawlker)](./LICENSE)
 
 Graphawler es un motor de pruebas E2E basado en Playwright para Node.js. Registra las interacciones manuales del navegador y genera automáticamente archivos de test ejecutables en Vitest, acompañados de un reporte HTML en formato de línea de tiempo con capturas de pantalla de la interfaz de usuario.
 
