@@ -1,0 +1,33 @@
+target:
+  base_url: "https://example.com"
+  same_domain_only: true
+
+navigation_rules:
+  include_selectors:
+    - "a[href]"
+    - "button"
+    - "[role=button]"
+  exclude_selectors:
+    - "footer a"
+    - "[data-crawler-skip]"
+  max_depth: 3
+  dedupe_by: "url"
+
+modal_rules:
+  selectors:
+    - "[role=dialog]"
+    - "[aria-modal=true]"
+    - ".modal"
+  close_strategies:
+    - "Escape"
+    - "[aria-label=close]"
+    - "backdrop_click"
+  modal_depth: 1
+
+auth:
+  required: false
+
+output:
+  screenshots_dir: "./output/screenshots"
+  data_file: "./output/tree.json"
+  report_format: ["html", "pdf"]

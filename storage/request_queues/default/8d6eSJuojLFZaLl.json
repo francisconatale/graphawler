@@ -1,0 +1,9 @@
+{
+	"id": "8d6eSJuojLFZaLl",
+	"json": "{\"id\":\"8d6eSJuojLFZaLl\",\"url\":\"http://localhost:3000\",\"loadedUrl\":\"http://localhost:3000/\",\"uniqueKey\":\"http://localhost:3000\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":1,\"errorMessages\":[\"page.waitForTimeout: Target page, context or browser has been closed\\n    at waitForStabilization (C:\\\\Users\\\\compu\\\\OneDrive\\\\Desktop\\\\crawlker\\\\src\\\\recorder\\\\snapshot.ts:23:14)\\n    at async PlaywrightCrawler.requestHandler (C:\\\\Users\\\\compu\\\\OneDrive\\\\Desktop\\\\crawlker\\\\src\\\\crawler\\\\explorer.ts:60:7)\\n    at async wrap (C:\\\\Users\\\\compu\\\\OneDrive\\\\Desktop\\\\crawlker\\\\node_modules\\\\@apify\\\\src\\\\index.ts:78:27)\"],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":5}}}",
+	"method": "GET",
+	"orderNo": 1785186377654,
+	"retryCount": 1,
+	"uniqueKey": "http://localhost:3000",
+	"url": "http://localhost:3000"
+}

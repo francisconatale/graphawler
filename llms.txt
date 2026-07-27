@@ -1,0 +1,20 @@
+# SnapFlow (Crawlker)
+
+> Un motor de pruebas E2E basado en Playwright que convierte interacciones manuales en tests ejecutables y genera reportes HTML en línea de tiempo.
+
+## Project Structure
+- `src/crawler/manual_explorer.ts`: Archivo principal del explorador manual. Utiliza `page.addInitScript` para inyectar un MutationObserver y escuchar clics en elementos clickeables (`button, a, input`). Expone `recordUserAction` vía IPC.
+- `src/reporter/html_generator.ts`: Construye reportes de timeline en formato HTML puro y estático. Destaca peticiones de API según su método (GET, POST).
+- `crawler.config.yaml`: Archivo de configuración que dictamina la URL base, umbrales y reglas para el modo de exploración 100% autónomo.
+- `output/`: Directorio donde se almacenan los reportes HTML generados y los screenshots capturados.
+- `tests/e2e/`: Directorio destino donde SnapFlow inyecta los tests auto-generados de Vitest (p. ej. cuando se usa `--automatized-test`).
+
+## Core Concepts
+- **Interceptación de Red**: El crawler mapea peticiones tipo `fetch` o `xhr` ignorando estáticos como CSS o scripts. El diseño actual escucha `response` en vez de `request` (lo que será mitigado según especificaciones de `specs/001-visual-ui-crawler/network_interception.md`).
+- **AST Test Generation**: Las secuencias de acciones del usuario se traducen al vuelo (a través de literales de strings de TypeScript) para ensamblar un test validado con `vitest`.
+- **Modos CLI**: Controlables por medio de banderas pasadas al script principal (ej: `--automatized-test`, `--manual-login`, `--manual-flow`, `--config`).
+
+## Tooling & Standards
+- TypeScript
+- Playwright (Control e inyección DOM)
+- Vitest (Ejecución E2E de código auto-generado)

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Site - Home</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f0f0f0; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    a { display: inline-block; margin-top: 20px; color: blue; text-decoration: none; }
+    
+    /* Modal styles */
+    .modal-backdrop {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); justify-content: center; align-items: center;
+    }
+    .modal {
+      background: white; padding: 2rem; border-radius: 8px; width: 300px; text-align: center;
+    }
+    .modal-backdrop.open { display: flex; }
+  </style>
+</head>
+<body>
+  <h1>Visual UI Crawler - Demo Site</h1>
+  <p>Esta es la página principal.</p>
+
+  <!-- Navigation link -->
+  <a href="/page2.html" data-cta>Ir a la Página 2</a>
+  <br><br>
+
+  <!-- Ejemplo de input accesible sin etiqueta <label> -->
+  <div style="margin-bottom: 20px;">
+    <h3>Prueba de accesibilidad (Input)</h3>
+    <input type="text" aria-label="Buscar en el sitio" placeholder="Buscar..." style="padding: 8px; width: 200px;">
+    <button>Buscar</button>
+  </div>
+  <br>
+
+  <!-- Modal trigger -->
+  <button id="open-modal-btn">Abrir Modal</button>
+
+  <!-- The Modal -->
+  <div id="my-modal" class="modal-backdrop" role="dialog">
+    <div class="modal">
+      <h2>¡Hola, soy un modal!</h2>
+      <p>El crawler debería detectar que esto se abrió y sacarle una captura.</p>
+      <button aria-label="close" onclick="closeModal()">Cerrar Modal</button>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('my-modal');
+    const btn = document.getElementById('open-modal-btn');
+    
+    btn.onclick = function() {
+      modal.classList.add('open');
+    }
+    
+    function closeModal() {
+      modal.classList.remove('open');
+    }
+
+    // Cerrar si se hace click en el fondo
+    modal.onclick = function(e) {
+      if (e.target === modal) {
+        closeModal();
+      }
+    }
+  </script>
+</body>
+</html>

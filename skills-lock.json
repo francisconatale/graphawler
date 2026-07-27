@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "documentation": {
+      "source": "anthropics/knowledge-work-plugins",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/documentation/SKILL.md",
+      "computedHash": "43947d80ab634432362a076657eb225212760adbe731c0829a92709aeb842666"
+    },
+    "golang-documentation": {
+      "source": "samber/cc-skills-golang",
+      "sourceType": "github",
+      "skillPath": "skills/golang-documentation/SKILL.md",
+      "computedHash": "8e2c4b7302a24f172eaed70d2ddd934e309ccd982b965996728bf4801bcf3dc7"
+    }
+  }
+}
