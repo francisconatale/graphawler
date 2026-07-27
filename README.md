@@ -1,4 +1,4 @@
-# Graphawler (anteriormente Crawlker)
+# Graphawler
 
 [![License](https://img.shields.io/github/license/francisconatale/crawlker)](./LICENSE)
 
