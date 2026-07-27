@@ -1,25 +1,32 @@
-# SnapFlow (anteriormente Crawlker) 📸⚡
+# Graphawler (anteriormente Crawlker)
 
 [![License](https://img.shields.io/github/license/YOUR_ORG/crawlker)](./LICENSE)
 
-SnapFlow es un motor de pruebas E2E basado en Playwright para Node.js. Registra las interacciones manuales del navegador y genera automáticamente archivos de test ejecutables en Vitest, acompañados de un reporte HTML en formato de línea de tiempo con capturas de pantalla de la interfaz de usuario.
+Graphawler es un motor de pruebas E2E basado en Playwright para Node.js. Registra las interacciones manuales del navegador y genera automáticamente archivos de test ejecutables en Vitest, acompañados de un reporte HTML en formato de línea de tiempo con capturas de pantalla de la interfaz de usuario.
 
 ## Demo
 
 ```typescript
-// Test generado automáticamente por SnapFlow tras una sesión de usuario
+// Test generado automáticamente por Graphawler tras una sesión de usuario
 import { test, expect } from 'vitest';
-import { chromium } from 'playwright';
 
-test('Flujo de compra automatizado', async () => {
+test('Flujo de prueba de contador', async () => {
   // Configuración base inyectada automáticamente
-  await page.goto('https://miapp.com');
+  await page.goto('http://localhost:3000/');
   
+  // Alt+Click en el contador genera un expect automáticamente (Estado inicial)
+  const counter_initial = await page.locator('[data-testid="counter-value"]').textContent();
+  expect(counter_initial).toContain('0');
+
   // Interacciones registradas
-  await page.click('button[data-testid="comprar"]');
+  await page.click('[data-testid="increment-btn"]');
   await page.waitForTimeout(1500);
   
-  // SnapFlow captura el DOM, red y toma el screenshot de este paso.
+  // Alt+Click en el contador genera un expect automáticamente (Estado final)
+  const counter_final = await page.locator('[data-testid="counter-value"]').textContent();
+  expect(counter_final).toContain('1');
+  
+  // Graphawler captura el DOM, red y toma el screenshot de cada paso.
 });
 ```
 
@@ -43,9 +50,9 @@ npx vitest tests/e2e/mi-primer-test.test.ts
 
 ## Features / Modos de Ejecución
 
-SnapFlow ofrece cuatro modos de ejecución mediante parámetros CLI (`npm start -- [flags]`):
+Graphawler ofrece cuatro modos de ejecución mediante parámetros CLI (`npm start -- [flags]`):
 
-- **`--automatized-test <nombre>`** (Recomendado): Abre una sesión interactiva. Cada navegación y clic se convierte en código TypeScript (Vitest) y se captura visualmente.
+- **`--automatized-test <nombre>`** (Recomendado): Abre una sesión interactiva. Cada navegación y clic se convierte en código TypeScript (Vitest) y se captura visualmente. Además, permite registrar **aserciones (`expects`)** de forma interactiva haciendo `Alt+Click` sobre cualquier elemento de la página.
 - **`--manual-flow [--flow-name <nombre>]`**: Registra interacciones y genera un reporte HTML/JSON, pero omite la creación del archivo de test. Útil para auditoría visual sin testing.
 - **Sin flags (Automático Clásico)**: Explora la aplicación autónomamente descubriendo enlaces y componentes basado en reglas definidas en `crawler.config.yaml`.
 - **`--manual-login`**: Pausa la ejecución automática inicial para permitir el ingreso de credenciales de usuario. Continúa de forma autónoma al presionar Enter en la consola.
