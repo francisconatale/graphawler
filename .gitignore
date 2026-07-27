@@ -6,3 +6,6 @@ build/
 output/
 playwright-report/
 test-results/
+specs/
+.agents/
+.specify/
