@@ -1,7 +1,5 @@
 # Graphawler
 
-[![License](https://img.shields.io/github/license/francisconatale/crawlker)](./LICENSE)
-
 Graphawler es un motor de pruebas E2E basado en Playwright para Node.js. \
 Registra las interacciones manuales del navegador y genera automáticamente archivos de test ejecutables en Vitest, acompañados de un reporte HTML en formato de línea de tiempo con capturas de pantalla de la interfaz de usuario.
 
@@ -12,18 +10,18 @@ Registra las interacciones manuales del navegador y genera automáticamente arch
 import { test, expect } from 'vitest';
 
 test('Flujo de prueba de contador', async () => {
-  // Configuración base inyectada automáticamente
+  // configuración base inyectada automáticamente
   await page.goto('http://localhost:3000/');
   
-  // Alt+Click en el contador genera un expect automáticamente (Estado inicial)
+  // click en donde se encuentra el valor inicial
   const counter_initial = await page.locator('[data-testid="counter-value"]').textContent();
   expect(counter_initial).toContain('0');
 
-  // Interacciones registradas
+  // interacciones registradas
   await page.click('[data-testid="increment-btn"]');
   await page.waitForTimeout(1500);
   
-  // Alt+Click en el contador genera un expect automáticamente (Estado final)
+  // click en donde se encuentra el valor valor final
   const counter_final = await page.locator('[data-testid="counter-value"]').textContent();
   expect(counter_final).toContain('1');
   
