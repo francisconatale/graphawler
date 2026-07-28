@@ -252,16 +252,17 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
   });
 
   // Expose function to track assertions
-  await page.exposeFunction('recordAssertion', (info: { selector: string, expectedValue: string }) => {
+  await page.exposeFunction('recordAssertion', (info: { selector: string, expectedValue: string, assertType?: string }) => {
     if (!recordingEnabled) return;
-    console.log(`\n[Event] Assertion recorded: expect(${info.selector}) to contain '${info.expectedValue}'`);
+    const assertType = info.assertType || 'toContain';
+    console.log(`\n[Event] Assertion recorded: expect(${info.selector}).${assertType}('${info.expectedValue}')`);
     const cleanSelector = info.selector.replace(/'/g, "\\'");
     const cleanValue = info.expectedValue.replace(/'/g, "\\'");
     
     const varName = 'val_' + Math.random().toString(36).substring(2, 7);
     generatedTestLines.push(`  // --- Assertion Manual ---`);
     generatedTestLines.push(`  const ${varName} = await page.locator('${cleanSelector}').textContent();`);
-    generatedTestLines.push(`  expect(${varName}).toContain('${cleanValue}');\n`);
+    generatedTestLines.push(`  expect(${varName}).${assertType}('${cleanValue}');\n`);
   });
 
   // Expose function to track clicks
@@ -289,8 +290,6 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
   await page.addInitScript(() => {
     console.log('[Graphawler-Debug] InitScript injected');
 
-    const topWin = window.top || window;
-
     function showToast(msg: string) {
       const toast = document.createElement('div');
       toast.textContent = msg;
@@ -305,44 +304,9 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
       toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
       toast.style.fontFamily = 'sans-serif';
       toast.style.fontSize = '14px';
-      (topWin.document.body || document.body).appendChild(toast);
+      document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2000);
     }
-
-    document.addEventListener('contextmenu', (e) => {
-      const target = e.target as HTMLElement;
-      if (!target || typeof target.closest !== 'function') return;
-      
-      if (target.closest('#graphawler-toolbar-container')) return;
-      if (target.id && target.id.startsWith('crawlker-prompt-')) return;
-      if (target.closest('#crawlker-custom-prompt')) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      const clickable = target.closest('button, a, [role="button"], input, select, textarea') as HTMLElement;
-      
-      const elParaLeer = clickable || target;
-      
-      function getSelector(el: HTMLElement) {
-        if (el.getAttribute('data-testid')) return '[data-testid="' + el.getAttribute('data-testid') + '"]';
-        if (el.id) return '#' + el.id;
-        if (el.getAttribute('name')) return '[name="' + el.getAttribute('name') + '"]';
-        
-        let selector = el.tagName.toLowerCase();
-        if (el.className && typeof el.className === 'string') {
-          const classes = el.className.split(' ').filter(c => c && !c.includes(':')).join('.');
-          if (classes) selector += '.' + classes;
-        }
-        return selector;
-      }
-
-      const selector = getSelector(elParaLeer);
-      const currentValue = (elParaLeer.innerText || (elParaLeer as HTMLInputElement).value || elParaLeer.textContent || '').trim();
-      
-      showToast('Aserción registrada: ' + selector + ' = "' + currentValue + '"');
-      (topWin as any).recordAssertion({ selector: selector, expectedValue: currentValue }).catch(console.error);
-    }, { capture: true });
 
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -352,14 +316,12 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
       if (target.id && target.id.startsWith('crawlker-prompt-')) return;
       if (target.closest('#crawlker-custom-prompt')) return;
 
-      console.log('[Graphawler] Click intercepted!');
       const clickable = target.closest('button, a, [role="button"], input, select, textarea') as HTMLElement;
-      
+
       function getSelector(el: HTMLElement) {
         if (el.getAttribute('data-testid')) return '[data-testid="' + el.getAttribute('data-testid') + '"]';
         if (el.id) return '#' + el.id;
         if (el.getAttribute('name')) return '[name="' + el.getAttribute('name') + '"]';
-        
         let selector = el.tagName.toLowerCase();
         if (el.className && typeof el.className === 'string') {
           const classes = el.className.split(' ').filter(c => c && !c.includes(':')).join('.');
@@ -369,21 +331,18 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
       }
 
       if (clickable) {
+        console.log('[Graphawler] Click intercepted!');
         const text = clickable.innerText || (clickable as HTMLInputElement).value || 'Click';
         const selector = getSelector(clickable);
         showToast('Acción registrada: ' + text);
-        (topWin as any).recordUserAction({ text, selector }).catch(console.error);
-      } else {
-        const selector = target.tagName ? target.tagName.toLowerCase() : 'unknown';
-        showToast('Acción registrada: ' + selector);
-        (topWin as any).recordUserAction({ text: 'Click', selector }).catch(console.error);
+        if (typeof recordUserAction !== 'undefined') {
+          recordUserAction({ text, selector });
+        }
       }
     }, { capture: true });
   });
 
   await page.addInitScript(`
-    const topWin = window.top || window;
-
     const isLoader = (el) => {
       const cls = el.className;
       if (typeof cls === 'string' && /loader|loading|spinner|skeleton/i.test(cls)) return true;
@@ -399,7 +358,9 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
       
       if (isCurrentlyLoading !== wasLoading) {
         wasLoading = isCurrentlyLoading;
-        topWin.recordDomLoadingState(isCurrentlyLoading);
+        if (typeof recordDomLoadingState !== 'undefined') {
+          recordDomLoadingState(isCurrentlyLoading);
+        }
       }
     });
 
@@ -497,7 +458,7 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
       <div id="graphawler-toolbar-container">
         <div style="display: flex; gap: 8px; align-items: center;">
           <button id="crawlker-ui-start" class="btn">▶️ Iniciar Grabación</button>
-          <span style="color: #ccc; font-size: 14px; margin-left: 8px;">(🖱 Click izq = Navegar | 🖱 Click derecho = Validar valor)</span>
+          <span style="color: #ccc; font-size: 14px; margin-left: 8px;">(🖱 Click en valor = Assert | Click en botón = Navegar)</span>
           <div id="crawlker-ui-separator"></div>
           <button id="crawlker-ui-finish" class="btn">⏹️ Finalizar</button>
         </div>
