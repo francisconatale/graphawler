@@ -287,61 +287,6 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
     }, 1500); 
   });
 
-  await page.addInitScript(() => {
-    console.log('[Graphawler-Debug] InitScript injected');
-
-    function showToast(msg: string) {
-      const toast = document.createElement('div');
-      toast.textContent = msg;
-      toast.style.position = 'fixed';
-      toast.style.bottom = '80px';
-      toast.style.right = '20px';
-      toast.style.background = '#000';
-      toast.style.color = '#fff';
-      toast.style.padding = '12px 16px';
-      toast.style.borderRadius = '8px';
-      toast.style.zIndex = '2147483647';
-      toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-      toast.style.fontFamily = 'sans-serif';
-      toast.style.fontSize = '14px';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
-    }
-
-    document.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (!target || typeof target.closest !== 'function') return;
-      
-      if (target.closest('#graphawler-toolbar-container')) return;
-      if (target.id && target.id.startsWith('crawlker-prompt-')) return;
-      if (target.closest('#crawlker-custom-prompt')) return;
-
-      const clickable = target.closest('button, a, [role="button"], input, select, textarea') as HTMLElement;
-
-      function getSelector(el: HTMLElement) {
-        if (el.getAttribute('data-testid')) return '[data-testid="' + el.getAttribute('data-testid') + '"]';
-        if (el.id) return '#' + el.id;
-        if (el.getAttribute('name')) return '[name="' + el.getAttribute('name') + '"]';
-        let selector = el.tagName.toLowerCase();
-        if (el.className && typeof el.className === 'string') {
-          const classes = el.className.split(' ').filter(c => c && !c.includes(':')).join('.');
-          if (classes) selector += '.' + classes;
-        }
-        return selector;
-      }
-
-      if (clickable) {
-        console.log('[Graphawler] Click intercepted!');
-        const text = clickable.innerText || (clickable as HTMLInputElement).value || 'Click';
-        const selector = getSelector(clickable);
-        showToast('Acción registrada: ' + text);
-        if (typeof recordUserAction !== 'undefined') {
-          recordUserAction({ text, selector });
-        }
-      }
-    }, { capture: true });
-  });
-
   await page.addInitScript(`
     const isLoader = (el) => {
       const cls = el.className;

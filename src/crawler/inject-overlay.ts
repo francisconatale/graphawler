@@ -192,9 +192,18 @@ export function getOverlayScript(): string {
         tooltip.style.display = 'block';
       }, { capture: true });
 
+      function isToolbar(el) {
+        return el.closest && (
+          el.closest('#graphawler-toolbar-container') ||
+          el.closest('#crawlker-custom-prompt') ||
+          (el.id && el.id.startsWith('crawlker-prompt-'))
+        );
+      }
+
       document.addEventListener('click', function(e) {
         if (isAssertionModalOpen) return;
         if (e.target.closest && e.target.closest('#crawlker-assertion-modal, .crawlker-modal-overlay')) return;
+        if (isToolbar(e.target)) return;
 
         var target = e.target;
         var clickable = isClickable(target);
@@ -204,6 +213,9 @@ export function getOverlayScript(): string {
         if (clickable) {
           var selector = getSelector(clickable);
           console.log('[INSPECTOR] Clicked element: ' + selector);
+          if (typeof recordUserAction !== 'undefined') {
+            recordUserAction({ text: clickable.innerText || clickable.value || 'Click', selector: selector });
+          }
         } else if (val) {
           e.stopPropagation();
           e.preventDefault();
