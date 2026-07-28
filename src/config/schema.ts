@@ -19,6 +19,7 @@ export const ConfigSchema = z.object({
   auth: z.object({
     required: z.boolean().default(false),
   }).default({}),
+  inspect: z.boolean().default(false),
   output: z.object({
     screenshots_dir: z.string().default('./output/screenshots'),
     data_file: z.string().default('./output/tree.json'),

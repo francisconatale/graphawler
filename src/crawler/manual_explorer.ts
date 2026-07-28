@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { Config } from '../config/schema';
 import { Logger } from '../recorder/logger';
+import { injectOverlay } from './inject-overlay';
 import { takeSnapshot } from '../recorder/snapshot';
 import crypto from 'node:crypto';
 import * as readline from 'node:readline/promises';
@@ -95,7 +96,8 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
     if (isCapturing) return;
     isCapturing = true;
     try {
-      const currentUrl = page.url();
+      const appFrame = page.frames().find(f => f.name() === 'app-frame');
+      const currentUrl = appFrame ? appFrame.url() : page.url();
       
       let selectorForId = undefined;
       if (type !== 'navigation') {
@@ -284,40 +286,49 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
     }, 1500); 
   });
 
-  await page.addInitScript(`
-    // Visual feedback for clicks
-    function showToast(msg) {
+  await page.addInitScript(() => {
+    console.log('[Graphawler-Debug] InitScript injected');
+
+    const topWin = window.top || window;
+
+    function showToast(msg: string) {
       const toast = document.createElement('div');
       toast.textContent = msg;
       toast.style.position = 'fixed';
-      toast.style.bottom = '20px';
+      toast.style.bottom = '80px';
       toast.style.right = '20px';
-      toast.style.background = '#ff00ff';
+      toast.style.background = '#000';
       toast.style.color = '#fff';
-      toast.style.padding = '10px';
-      toast.style.borderRadius = '5px';
-      toast.style.zIndex = '9999999';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 1500);
+      toast.style.padding = '12px 16px';
+      toast.style.borderRadius = '8px';
+      toast.style.zIndex = '2147483647';
+      toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+      toast.style.fontFamily = 'sans-serif';
+      toast.style.fontSize = '14px';
+      (topWin.document.body || document.body).appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
     }
 
-    // Click listener
-    document.addEventListener('click', (e) => {
-      const target = e.target;
+    document.addEventListener('contextmenu', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target || typeof target.closest !== 'function') return;
       
-      // Ignorar clicks dentro de nuestro propio prompt modal
-      if (target && target.id && target.id.startsWith('crawlker-prompt-')) return;
-      if (target && target.closest && target.closest('#crawlker-custom-prompt')) return;
+      if (target.closest('#graphawler-toolbar-container')) return;
+      if (target.id && target.id.startsWith('crawlker-prompt-')) return;
+      if (target.closest('#crawlker-custom-prompt')) return;
 
-      console.log('[Crawlker] Click intercepted!');
-      const clickable = target.closest('button, a, [role="button"], input, select, textarea');
+      e.preventDefault();
+      e.stopPropagation();
+
+      const clickable = target.closest('button, a, [role="button"], input, select, textarea') as HTMLElement;
       
-      function getSelector(el) {
+      const elParaLeer = clickable || target;
+      
+      function getSelector(el: HTMLElement) {
         if (el.getAttribute('data-testid')) return '[data-testid="' + el.getAttribute('data-testid') + '"]';
         if (el.id) return '#' + el.id;
         if (el.getAttribute('name')) return '[name="' + el.getAttribute('name') + '"]';
         
-        // Improve selector generation
         let selector = el.tagName.toLowerCase();
         if (el.className && typeof el.className === 'string') {
           const classes = el.className.split(' ').filter(c => c && !c.includes(':')).join('.');
@@ -326,71 +337,53 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
         return selector;
       }
 
-      // Alt+Click para registrar un expect manual
-      if (e.altKey) {
-        e.preventDefault();
-        e.stopPropagation();
+      const selector = getSelector(elParaLeer);
+      const currentValue = (elParaLeer.innerText || (elParaLeer as HTMLInputElement).value || elParaLeer.textContent || '').trim();
+      
+      showToast('Aserción registrada: ' + selector + ' = "' + currentValue + '"');
+      (topWin as any).recordAssertion({ selector: selector, expectedValue: currentValue }).catch(console.error);
+    }, { capture: true });
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target || typeof target.closest !== 'function') return;
+      
+      if (target.closest('#graphawler-toolbar-container')) return;
+      if (target.id && target.id.startsWith('crawlker-prompt-')) return;
+      if (target.closest('#crawlker-custom-prompt')) return;
+
+      console.log('[Graphawler] Click intercepted!');
+      const clickable = target.closest('button, a, [role="button"], input, select, textarea') as HTMLElement;
+      
+      function getSelector(el: HTMLElement) {
+        if (el.getAttribute('data-testid')) return '[data-testid="' + el.getAttribute('data-testid') + '"]';
+        if (el.id) return '#' + el.id;
+        if (el.getAttribute('name')) return '[name="' + el.getAttribute('name') + '"]';
         
-        // Si no hay un target específico, usamos el general
-        const elParaLeer = clickable || target;
-        const selector = getSelector(elParaLeer);
-        const currentValue = elParaLeer.innerText || elParaLeer.value || elParaLeer.textContent || '';
-        
-        // Crear un modal HTML custom porque Playwright auto-descarta window.prompt
-        const customPrompt = document.createElement('div');
-        customPrompt.id = 'crawlker-custom-prompt';
-        customPrompt.style.position = 'fixed';
-        customPrompt.style.top = '50%';
-        customPrompt.style.left = '50%';
-        customPrompt.style.transform = 'translate(-50%, -50%)';
-        customPrompt.style.background = 'white';
-        customPrompt.style.padding = '20px';
-        customPrompt.style.border = '2px solid black';
-        customPrompt.style.zIndex = '9999999';
-        customPrompt.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
-        customPrompt.innerHTML = 
-          '<p style="margin-top: 0; color: black; font-family: sans-serif;">Ingresa el valor esperado para este campo:</p>' +
-          '<input type="text" id="crawlker-prompt-input" style="width: 100%; margin-bottom: 10px; padding: 5px;" />' +
-          '<div style="text-align: right;">' +
-            '<button id="crawlker-prompt-cancel" style="margin-right: 10px;">Cancelar</button>' +
-            '<button id="crawlker-prompt-ok">OK</button>' +
-          '</div>';
-        document.body.appendChild(customPrompt);
-        
-        const input = document.getElementById('crawlker-prompt-input');
-        input.value = currentValue.trim();
-        input.focus();
-        
-        document.getElementById('crawlker-prompt-ok').onclick = function(ev) {
-          ev.stopPropagation();
-          const expectedValue = input.value;
-          customPrompt.remove();
-          showToast('Assertion: ' + expectedValue);
-          window.recordAssertion({ selector: selector, expectedValue: expectedValue }).catch(console.error);
-        };
-        
-        document.getElementById('crawlker-prompt-cancel').onclick = function(ev) {
-          ev.stopPropagation();
-          customPrompt.remove();
-        };
-        return;
+        let selector = el.tagName.toLowerCase();
+        if (el.className && typeof el.className === 'string') {
+          const classes = el.className.split(' ').filter(c => c && !c.includes(':')).join('.');
+          if (classes) selector += '.' + classes;
+        }
+        return selector;
       }
 
       if (clickable) {
-        const text = clickable.innerText || clickable.value || 'Click';
+        const text = clickable.innerText || (clickable as HTMLInputElement).value || 'Click';
         const selector = getSelector(clickable);
-        showToast('Recorded: ' + text);
-        window.recordUserAction({ text, selector }).catch(console.error);
+        showToast('Acción registrada: ' + text);
+        (topWin as any).recordUserAction({ text, selector }).catch(console.error);
       } else {
         const selector = target.tagName ? target.tagName.toLowerCase() : 'unknown';
-        showToast('Recorded: ' + selector);
-        window.recordUserAction({ text: 'Click', selector }).catch(console.error);
+        showToast('Acción registrada: ' + selector);
+        (topWin as any).recordUserAction({ text: 'Click', selector }).catch(console.error);
       }
     }, { capture: true });
-  `);
+  });
 
   await page.addInitScript(`
-    // Loading state observer
+    const topWin = window.top || window;
+
     const isLoader = (el) => {
       const cls = el.className;
       if (typeof cls === 'string' && /loader|loading|spinner|skeleton/i.test(cls)) return true;
@@ -406,142 +399,145 @@ export async function runManualExplorer(config: Config, logger: Logger, testName
       
       if (isCurrentlyLoading !== wasLoading) {
         wasLoading = isCurrentlyLoading;
-        window.recordDomLoadingState(isCurrentlyLoading);
+        topWin.recordDomLoadingState(isCurrentlyLoading);
       }
     });
 
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-busy'] });
   `);
 
-  // Listen for full page loads
-  page.on('load', async () => {
+  // Listen for iframe full page loads
+  page.on('framenavigated', async (frame) => {
     if (!recordingEnabled) return;
-    if (actionTimeout) clearTimeout(actionTimeout);
-    hasCapturedLoadingForCurrentAction = false;
-    await captureState(lastActionTrigger || { text: 'Page Load', selector: 'navigation' }, 'navigation');
-    lastActionTrigger = null;
+    if (frame.name() === 'app-frame') {
+      if (actionTimeout) clearTimeout(actionTimeout);
+      hasCapturedLoadingForCurrentAction = false;
+      await captureState(lastActionTrigger || { text: 'Page Load', selector: 'navigation' }, 'navigation');
+      lastActionTrigger = null;
+    }
   });
 
   // Forward browser console logs to terminal
   page.on('console', msg => {
     if (msg.type() === 'error') {
       console.error(`[Browser Error] ${msg.text()}`);
-    } else if (msg.text().includes('[Crawlker]')) {
+    } else {
       console.log(`[Browser Log] ${msg.text()}`);
     }
   });
 
-  // Inject script to listen for clicks and DOM mutations (loaders)
-  await page.addInitScript(() => {
-    function initOverlay() {
-      if (document.getElementById('crawlker-style')) return;
-      
-      const style = document.createElement('style');
-      style.id = 'crawlker-style';
-      style.innerHTML = `
-        .crawlker-highlight-overlay {
-          position: absolute;
-          pointer-events: none;
-          z-index: 999998;
-          border: 2px dashed #ff00ff;
-          background-color: rgba(255, 0, 255, 0.1);
-        }
-        .crawlker-tooltip {
-          position: absolute;
-          pointer-events: none;
-          z-index: 999999;
-          background-color: #ff00ff;
-          color: #fff;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 11px;
-          white-space: nowrap;
-          transform: translateY(-100%);
-          margin-top: -2px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-      `;
-      document.head.appendChild(style);
+  await injectOverlay(page);
 
-      const overlay = document.createElement('div');
-      overlay.className = 'crawlker-highlight-overlay';
-      overlay.style.display = 'none';
-      document.body.appendChild(overlay);
-
-      const tooltip = document.createElement('div');
-      tooltip.className = 'crawlker-tooltip';
-      tooltip.style.display = 'none';
-      document.body.appendChild(tooltip);
-
-      function getSelector(el: HTMLElement) {
-        if (el.getAttribute('data-testid')) return `[data-testid="${el.getAttribute('data-testid')}"]`;
-        if (el.id) return `#${el.id}`;
-        if (el.getAttribute('name')) return `[name="${el.getAttribute('name')}"]`;
-        return el.tagName.toLowerCase();
-      }
-
-      document.addEventListener('mouseover', (e) => {
-        const target = e.target as HTMLElement;
-        const clickable = target.closest('button, a, [role="button"], input, select, textarea') as HTMLElement;
-        
-        if (clickable) {
-          const rect = clickable.getBoundingClientRect();
-          const scrollX = window.scrollX || window.pageXOffset;
-          const scrollY = window.scrollY || window.pageYOffset;
-          
-          overlay.style.top = `${rect.top + scrollY}px`;
-          overlay.style.left = `${rect.left + scrollX}px`;
-          overlay.style.width = `${rect.width}px`;
-          overlay.style.height = `${rect.height}px`;
-          overlay.style.display = 'block';
-
-          tooltip.textContent = getSelector(clickable);
-          tooltip.style.top = `${rect.top + scrollY}px`;
-          tooltip.style.left = `${rect.left + scrollX}px`;
-          tooltip.style.display = 'block';
-        } else {
-          overlay.style.display = 'none';
-          tooltip.style.display = 'none';
-        }
-      }, { capture: true });
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initOverlay);
-    } else {
-      initOverlay();
-    }
+  let finishRecordingResolve: () => void;
+  const finishRecordingPromise = new Promise<void>(resolve => {
+    finishRecordingResolve = resolve;
   });
 
-  await page.goto(config.target.base_url);
+  page.on('close', () => {
+    if (finishRecordingResolve) finishRecordingResolve();
+  });
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  await page.exposeFunction('isRecordingEnabled', () => {
+    return recordingEnabled;
+  });
 
-  console.log('\n--- MANUAL FLOW INSTRUCTIONS ---');
-  console.log('1. Navigate to the page where you want to start recording.');
-  console.log('2. Type "start" or "s" and press Enter to begin capturing.');
-  console.log('3. Navigate and click through your flow.');
-  console.log('4. Type "finish" or "f" and press Enter to save and exit.\n');
-
-  while (true) {
-    const prompt = recordingEnabled ? 'Action [f=finish]: ' : 'Action [s=start, f=finish]: ';
-    const answer = await rl.question(prompt);
-    
-    if (!recordingEnabled && (answer.toLowerCase() === 's' || answer.toLowerCase() === 'start')) {
+  await page.exposeFunction('triggerStartRecording', async () => {
+    if (!recordingEnabled) {
       recordingEnabled = true;
       initTestGeneration();
       console.log('\n[Recording Started] Now capturing your navigation and clicks...');
       await captureState({ text: 'Flow Start', selector: 'manual_start' }, 'navigation');
-      continue;
     }
+  });
 
-    if (answer.toLowerCase() === 'f' || answer.toLowerCase() === 'finish') {
-      break;
+  await page.exposeFunction('triggerFinishRecording', () => {
+    finishRecordingResolve();
+  });
+
+  // Intercept requests to remove X-Frame-Options and CSP headers so we can frame the app
+  await page.route('**/*', async route => {
+    try {
+      const response = await route.fetch();
+      const headers = { ...response.headers() };
+      
+      // Remove security headers that prevent framing
+      const headersToRemove = ['x-frame-options', 'content-security-policy'];
+      for (const key of Object.keys(headers)) {
+        if (headersToRemove.includes(key.toLowerCase())) {
+          delete headers[key];
+        }
+      }
+      
+      await route.fulfill({ response, headers });
+    } catch (e) {
+      await route.continue().catch(() => {});
     }
-  }
+  });
 
-  rl.close();
+  const wrapperHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Graphawler Recorder</title>
+      <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, system-ui, sans-serif; }
+        #app-frame { width: 100%; height: calc(100vh - 60px); border: none; background: #fff; display: block; margin-top: 60px; }
+        #graphawler-toolbar-container {
+          height: 60px; width: 100%; background: #000; display: flex; align-items: center; justify-content: center;
+          border-bottom: 1px solid #333; position: fixed; top: 0; left: 0; z-index: 2147483647;
+        }
+        .btn { padding: 8px 16px; border-radius: 24px; cursor: pointer; font-size: 14px; font-weight: 600; border: none; transition: all 0.2s; }
+        #crawlker-ui-start { background: #10b981; color: #fff; }
+        #crawlker-ui-separator { display: none; width: 1px; height: 24px; background: #333; margin: 0 4px; }
+        #crawlker-ui-finish { display: none; background: #ef4444; color: #fff; }
+      </style>
+    </head>
+    <body>
+      <div id="graphawler-toolbar-container">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="crawlker-ui-start" class="btn">▶️ Iniciar Grabación</button>
+          <span style="color: #ccc; font-size: 14px; margin-left: 8px;">(🖱 Click izq = Navegar | 🖱 Click derecho = Validar valor)</span>
+          <div id="crawlker-ui-separator"></div>
+          <button id="crawlker-ui-finish" class="btn">⏹️ Finalizar</button>
+        </div>
+      </div>
+      <iframe id="app-frame" name="app-frame" src="${config.target.base_url}"></iframe>
+      <script>
+        const btnStart = document.getElementById('crawlker-ui-start');
+        const separator = document.getElementById('crawlker-ui-separator');
+        const btnFinish = document.getElementById('crawlker-ui-finish');
+
+        window.isRecordingEnabled().then(isRecording => {
+          if (isRecording) {
+            btnStart.style.display = 'none';
+            separator.style.display = 'block';
+            btnFinish.style.display = 'block';
+          }
+        });
+
+        btnStart.onclick = async () => {
+          btnStart.style.display = 'none';
+          separator.style.display = 'block';
+          btnFinish.style.display = 'block';
+          if (window.triggerStartRecording) await window.triggerStartRecording();
+        };
+
+        btnFinish.onclick = async () => {
+          btnFinish.innerText = 'Guardando...';
+          if (window.triggerFinishRecording) await window.triggerFinishRecording();
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  await page.setContent(wrapperHtml);
+
+  console.log('\n--- MANUAL FLOW INSTRUCTIONS ---');
+  console.log('Use the Graphawler floating toolbar in the browser to start and finish your recording.\n');
+
+  await finishRecordingPromise;
   await browser.close();
   await logger.save();
   

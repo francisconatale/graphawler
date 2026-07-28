@@ -4,6 +4,7 @@ import { Logger } from '../recorder/logger';
 import { takeSnapshot, waitForStabilization } from '../recorder/snapshot';
 import { classifyTransition } from '../recorder/classifier';
 import { closeModal } from './modal_handler';
+import { injectOverlay } from './inject-overlay';
 import crypto from 'node:crypto';
 import * as readline from 'node:readline/promises';
 
@@ -44,6 +45,9 @@ export async function runExplorer(config: Config, logger: Logger, manualLogin = 
     preNavigationHooks: [
       async ({ page }) => {
         await page.setViewportSize({ width: 1920, height: 1080 });
+        if (config.inspect) {
+          await injectOverlay(page);
+        }
       }
     ],
     

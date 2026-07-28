@@ -9,15 +9,13 @@ async function main() {
   const args = process.argv.slice(2);
   
   const inspectIndex = args.indexOf('--inspect');
-  if (inspectIndex !== -1 && args[inspectIndex + 1]) {
-    const url = args[inspectIndex + 1];
-    if (!url.startsWith('http')) {
-      console.error('Please provide a valid URL, e.g. http://localhost:3000');
-      process.exit(1);
+  if (inspectIndex !== -1) {
+    const nextArg = args[inspectIndex + 1];
+    if (nextArg && nextArg.startsWith('http')) {
+      const { runInspector } = await import('./crawler/inspector');
+      await runInspector(nextArg);
+      return;
     }
-    const { runInspector } = await import('./crawler/inspector');
-    await runInspector(url);
-    return;
   }
 
   let configPath = 'crawler.config.yaml'; // Default
@@ -52,6 +50,10 @@ async function main() {
 
   console.log(`Loading configuration from ${configPath}...`);
   const config = await loadConfig(configPath);
+
+  if (args.includes('--inspect')) {
+    config.inspect = true;
+  }
 
   // Adjust output paths if flowName is provided
   let outputPrefix = '';
